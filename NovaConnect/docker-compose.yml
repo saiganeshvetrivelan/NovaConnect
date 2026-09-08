@@ -1,0 +1,44 @@
+# NovaConnect Docker Compose Orchestration
+
+version: '3.8'
+
+services:
+  # Backend Node.js API Service
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "5000:5000"
+    environment:
+      - DATABASE_URL=file:./dev.db
+      - JWT_SECRET=supersecretjwtkey
+    volumes:
+      - ./backend/dev.db:/app/dev.db
+      - ./backend/uploads:/app/uploads
+    depends_on:
+      - ai-service
+
+  # Python FastAPI AI Microservice
+  ai-service:
+    build:
+      context: ./ai-service
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+
+  # Frontend Next.js Service
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:5000
+      - NEXT_PUBLIC_AI_URL=http://localhost:8000
+    depends_on:
+      - backend
+
+volumes:
+  uploads:

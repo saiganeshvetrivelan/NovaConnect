@@ -1,0 +1,174 @@
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id            Int      @id @default(autoincrement())
+  name          String
+  roll_number   String?  @unique
+  email         String   @unique
+  password_hash String
+  role          String   // 'Student', 'Faculty', 'Admin'
+  department    String?
+  created_at    DateTime @default(now())
+  
+  // Relations
+  courses_taught  Course[]       @relation("FacultyCourses")
+  enrollments     Enrollment[]
+  messages_sent   Message[]      @relation("MessageSender")
+  messages_recv   Message[]      @relation("MessageReceiver")
+  posts           ForumPost[]
+  resources       Resource[]
+  assignments     Assignment[]
+  submissions     Submission[]
+  attendance      Attendance[]
+  forum_messages  ForumMessage[] @relation("ForumMessageSender")
+}
+
+model Course {
+  id          Int      @id @default(autoincrement())
+  course_code String   @unique
+  course_name String
+  faculty_id  Int?
+  semester    Int
+  
+  faculty        User?          @relation("FacultyCourses", fields: [faculty_id], references: [id])
+  enrollments    Enrollment[]
+  messages       Message[]
+  forums         Forum[]
+  resources      Resource[]
+  assignments    Assignment[]
+  attendance     Attendance[]
+  forum_messages ForumMessage[]
+}
+
+model Enrollment {
+  id         Int    @id @default(autoincrement())
+  student_id Int
+  course_id  Int
+  
+  student    User   @relation(fields: [student_id], references: [id], onDelete: Cascade)
+  course     Course @relation(fields: [course_id], references: [id], onDelete: Cascade)
+  
+  @@unique([student_id, course_id])
+}
+
+model Message {
+  id          Int      @id @default(autoincrement())
+  sender_id   Int
+  receiver_id Int?
+  course_id   Int?
+  content     String
+  timestamp   DateTime @default(now())
+
+  sender      User   @relation("MessageSender", fields: [sender_id], references: [id], onDelete: Cascade)
+  receiver    User?  @relation("MessageReceiver", fields: [receiver_id], references: [id], onDelete: Cascade)
+  course      Course? @relation(fields: [course_id], references: [id], onDelete: Cascade)
+}
+
+model Forum {
+  id          Int      @id @default(autoincrement())
+  course_id   Int
+  topic       String
+  description String?
+  created_at  DateTime @default(now())
+  
+  course         Course         @relation(fields: [course_id], references: [id], onDelete: Cascade)
+  posts          ForumPost[]
+  forum_messages ForumMessage[]
+}
+
+model ForumMessage {
+  id              Int      @id @default(autoincrement())
+  forum_id        Int
+  course_id       Int
+  sender_id       Int
+  message_text    String
+  ai_category     String?  @default("General")
+  attachment_url  String?
+  attachment_name String?
+  reply_to_id     Int?
+  is_pinned       Boolean  @default(false)
+  is_deleted      Boolean  @default(false)
+  created_at      DateTime @default(now())
+
+  forum    Forum          @relation(fields: [forum_id], references: [id], onDelete: Cascade)
+  course   Course         @relation(fields: [course_id], references: [id], onDelete: Cascade)
+  sender   User           @relation("ForumMessageSender", fields: [sender_id], references: [id], onDelete: Cascade)
+  reply_to ForumMessage?  @relation("MessageReplies", fields: [reply_to_id], references: [id])
+  replies  ForumMessage[] @relation("MessageReplies")
+}
+
+model ForumPost {
+  id             Int      @id @default(autoincrement())
+  forum_id       Int
+  user_id        Int
+  content        String
+  parent_post_id Int?
+  ai_category    String?
+  created_at     DateTime @default(now())
+
+  forum       Forum      @relation(fields: [forum_id], references: [id], onDelete: Cascade)
+  user        User       @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  parent      ForumPost? @relation("ThreadedPosts", fields: [parent_post_id], references: [id], onDelete: Cascade)
+  replies     ForumPost[] @relation("ThreadedPosts")
+}
+
+model Resource {
+  id          Int      @id @default(autoincrement())
+  course_id   Int
+  uploaded_by Int
+  title       String
+  file_url    String
+  file_type   String
+  uploaded_at DateTime @default(now())
+  
+  course      Course @relation(fields: [course_id], references: [id], onDelete: Cascade)
+  user        User   @relation(fields: [uploaded_by], references: [id], onDelete: Cascade)
+}
+
+model Assignment {
+  id          Int      @id @default(autoincrement())
+  course_id   Int
+  created_by  Int
+  title       String
+  description String?
+  deadline    DateTime
+  created_at  DateTime @default(now())
+  
+  course      Course       @relation(fields: [course_id], references: [id], onDelete: Cascade)
+  user        User         @relation(fields: [created_by], references: [id], onDelete: Cascade)
+  submissions Submission[]
+}
+
+model Submission {
+  id               Int      @id @default(autoincrement())
+  assignment_id    Int
+  student_id       Int
+  file_url         String
+  similarity_score Float?
+  grade            String?
+  feedback         String?
+  submitted_at     DateTime @default(now())
+
+  assignment  Assignment @relation(fields: [assignment_id], references: [id], onDelete: Cascade)
+  student     User       @relation(fields: [student_id], references: [id], onDelete: Cascade)
+}
+
+model Attendance {
+  id         Int      @id @default(autoincrement())
+  course_id  Int
+  student_id Int
+  date       DateTime
+  status     String   // Present, Absent, Late
+  
+  course     Course @relation(fields: [course_id], references: [id], onDelete: Cascade)
+  student    User   @relation(fields: [student_id], references: [id], onDelete: Cascade)
+  
+  @@unique([course_id, student_id, date])
+}
